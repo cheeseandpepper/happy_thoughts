@@ -8,7 +8,12 @@ class TextToSpeech
   end
 
   def generate!
-    `say -v #{@voice} #{@text} -o tmp/#{@text}.aiff `
+    case OS.mac?
+    when true
+      mac_generate
+    else
+      linux_generate
+    end
   end
 
   def convert!
@@ -25,5 +30,13 @@ class TextToSpeech
   def cleanup!
     `rm tmp/#{@text}.aiff`
     `rm tmp/#{@text}.mp3`
+  end
+
+  def linux_generate
+    `espeak #{@text} --stdout > tmp/#{@text}.aiff`
+  end
+
+  def mac_generate
+    `say -v #{@voice} #{@text} -o tmp/#{@text}.aiff`
   end
 end
