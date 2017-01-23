@@ -1,0 +1,71 @@
+<div class='play-container'>
+  <input type='button' id='play'>Play</input>
+  <input type='button' id='stop'>Stop</input>
+</div>
+
+
+<div class='input-container'>
+  <%= form_for @phrase do |phrase| %>
+    <%= phrase.text_field :text %>
+    <%= phrase.submit %>
+  <% end%>
+
+</div>
+
+
+<div class='list-of-files'>
+  <h2>PHRASES</h2>
+    <div class='container'>
+      <% @phrases.each do |phrase| %>
+        <div class='row'>
+          <div class="col-sm-4">
+            <%= phrase.text %>
+          </div>
+          
+          <div class="col-sm-4">
+            <a href='<%= phrase.url %>'>Play me</a>
+          </div>
+          
+          <div class="col-sm-4">
+            <%= form_tag(phrase_path(phrase.id), method: "delete") do %>
+              <input type="hidden" name="phrase[id]" value='<%= phrase.id %>' />
+              <%= submit_tag("Delete") %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+  </div>
+</div>
+
+
+<script>
+var playlist = [];
+$('.list-of-files a').each(function(index, element) {
+  playlist.push(element.href)
+})
+var audio = new Audio(playlist[0]);
+
+$('#play').click(function(e) {
+  var element = e.target
+  audio.play();
+})
+
+$('#stop').click(function(e) {
+  var element = e.target
+  audio.pause();
+})
+
+
+audio.addEventListener('ended',function(){
+  audio.src = randomFrom(playlist);
+  audio.pause();
+  audio.load();
+  audio.play();
+});
+
+function randomFrom(array) {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+</script>
+
