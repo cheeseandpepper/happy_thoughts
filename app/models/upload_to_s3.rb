@@ -1,4 +1,4 @@
-class UploadToS3
-  def initialize(file)
-  end
-end
+# class UploadToS3
+#   def initialize(file)
+#   end
+# end
