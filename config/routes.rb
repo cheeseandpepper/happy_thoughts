@@ -3,5 +3,5 @@ Rails.application.routes.draw do
 
   root to: 'phrases#index'
   resources :phrases
-
+  post "/phrases/record", to: 'phrases#record', as: :record_phrases
 end

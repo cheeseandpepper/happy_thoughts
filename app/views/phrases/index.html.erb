@@ -1,38 +1,17 @@
-<div class='play-container'>
-  <input type='button' id='play'>Play</input>
-  <input type='button' id='stop'>Stop</input>
+<div class='record-container'>
+  <input type='button' id='record-start'>Record</input>
+  <input type='button' id='record-stop'>Stop Recording</input>
+  <canvas id='visualizer'></canvas>
+  <input type='button' id='play-happy-thoughts'>Play Happy Thoughts</input>
+  <input type='button' id='stop-happy-thoughts'>Stop Happy Thoughts</input>
 </div>
 
-
-<div class='input-container'>
-  <%= form_for @phrase do |phrase| %>
-    <%= phrase.text_field :text %>
-    <%= phrase.submit %>
-  <% end%>
-
-</div>
-
-
+<br />
 <div class='list-of-files'>
-  <h2>PHRASES</h2>
+  <h2>Happy Thoughts</h2>
     <div class='container'>
       <% @phrases.each do |phrase| %>
-        <div class='row'>
-          <div class="col-sm-4">
-            <%= phrase.text %>
-          </div>
-          
-          <div class="col-sm-4">
-            <a href='<%= phrase.url %>'>Play me</a>
-          </div>
-          
-          <div class="col-sm-4">
-            <%= form_tag(phrase_path(phrase.id), method: "delete") do %>
-              <input type="hidden" name="phrase[id]" value='<%= phrase.id %>' />
-              <%= submit_tag("Delete") %>
-            <% end %>
-          </div>
-        </div>
+        <%= render partial: 'row', locals: { phrase: phrase } %>
       <% end %>
   </div>
 </div>
@@ -40,17 +19,17 @@
 
 <script>
 var playlist = [];
-$('.list-of-files a').each(function(index, element) {
-  playlist.push(element.href)
+$('audio').each(function(index, element) {
+  playlist.push(element.src)
 })
 var audio = new Audio(playlist[0]);
 
-$('#play').click(function(e) {
+$('#play-happy-thoughts').click(function(e) {
   var element = e.target
   audio.play();
 })
 
-$('#stop').click(function(e) {
+$('#stop-happy-thoughts').click(function(e) {
   var element = e.target
   audio.pause();
 })
@@ -65,6 +44,180 @@ audio.addEventListener('ended',function(){
 
 function randomFrom(array) {
   return array[Math.floor(Math.random() * array.length)];
+}
+
+
+
+// fork getUserMedia for multiple browser versions, for the future
+// when more browsers support MediaRecorder
+
+navigator.getUserMedia = ( navigator.getUserMedia       ||
+                           navigator.webkitGetUserMedia ||
+                           navigator.mozGetUserMedia    ||
+                           navigator.msGetUserMedia);
+
+// set up basic variables for app
+
+var record = document.querySelector('#record-start');
+var stop = document.querySelector('#record-stop');
+var soundClips = document.querySelector('#live-audio');
+var canvas = document.querySelector('#visualizer');
+
+// disable stop button while not recording
+
+stop.disabled = true;
+
+// visualiser setup - create web audio api context and canvas
+
+var audioCtx = new (window.AudioContext || webkitAudioContext)();
+var canvasCtx = canvas.getContext("2d");
+
+//main block for doing the audio recording
+
+if (navigator.getUserMedia) {
+  console.log('getUserMedia supported.');
+
+  var constraints = { audio: true };
+  var chunks = [];
+
+  var onSuccess = function(stream) {
+    var mediaRecorder = new MediaRecorder(stream);
+
+    visualize(stream);
+
+    record.onclick = function() {
+      mediaRecorder.start();
+      console.log(mediaRecorder.state);
+      console.log("recorder started");
+      record.style.background = "red";
+
+      stop.disabled = false;
+      record.disabled = true;
+    }
+
+    stop.onclick = function() {
+      mediaRecorder.stop();
+      console.log(mediaRecorder.state);
+      console.log("recorder stopped");
+      record.style.background = "";
+      record.style.color = "";
+      // mediaRecorder.requestData();
+
+      stop.disabled = true;
+      record.disabled = false;
+    }
+
+    mediaRecorder.onstop = function(e) {
+      console.log("data available after MediaRecorder.stop() called.");
+
+      var blob   = new Blob(chunks, { 'type' : 'audio/ogg; codecs=opus' });
+      var reader = new window.FileReader();
+      
+      reader.readAsDataURL(blob); 
+      
+      reader.onloadend = function() {
+        var title        = prompt("Enter a title");
+        var base64data   = reader.result;
+        var savedWAVBlob = base64data
+        
+        $.ajax({ url: '/phrases/record',
+          type: 'POST',
+          beforeSend: function(xhr) {xhr.setRequestHeader('X-CSRF-Token', $('meta[name="csrf-token"]').attr('content'))},
+          data: { phrase: { blob: savedWAVBlob, text: title } },
+          success: function(response) {
+            console.log("success");
+          }
+        });
+      }
+
+      chunks = [];
+      var audioURL = window.URL.createObjectURL(blob);
+      audio.src = audioURL;
+      
+      console.log("recorder stopped");
+
+      deleteButton.onclick = function(e) {
+        evtTgt = e.target;
+        evtTgt.parentNode.parentNode.removeChild(evtTgt.parentNode);
+      }
+
+      clipLabel.onclick = function() {
+        var existingName = clipLabel.textContent;
+        var newClipName = prompt('Enter a new name for your sound clip?');
+        if(newClipName === null) {
+          clipLabel.textContent = existingName;
+        } else {
+          clipLabel.textContent = newClipName;
+        }
+      }
+    }
+
+    mediaRecorder.ondataavailable = function(e) {
+      chunks.push(e.data);
+    }
+  }
+
+  var onError = function(err) {
+    console.log('The following error occured: ' + err);
+  }
+
+  navigator.getUserMedia(constraints, onSuccess, onError);
+} else {
+   console.log('getUserMedia not supported on your browser!');
+}
+
+function visualize(stream) {
+  var source = audioCtx.createMediaStreamSource(stream);
+
+  var analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  var bufferLength = analyser.frequencyBinCount;
+  var dataArray = new Uint8Array(bufferLength);
+
+  source.connect(analyser);
+  //analyser.connect(audioCtx.destination);
+  
+  WIDTH = canvas.width
+  HEIGHT = canvas.height;
+
+  draw()
+
+  function draw() {
+
+    requestAnimationFrame(draw);
+
+    analyser.getByteTimeDomainData(dataArray);
+
+    canvasCtx.fillStyle = 'rgb(200, 200, 200)';
+    canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    canvasCtx.lineWidth = 2;
+    canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
+
+    canvasCtx.beginPath();
+
+    var sliceWidth = WIDTH * 1.0 / bufferLength;
+    var x = 0;
+
+
+    for(var i = 0; i < bufferLength; i++) {
+ 
+      var v = dataArray[i] / 128.0;
+      var y = v * HEIGHT/2;
+
+      if(i === 0) {
+        canvasCtx.moveTo(x, y);
+      } else {
+        canvasCtx.lineTo(x, y);
+      }
+
+      x += sliceWidth;
+    }
+
+    canvasCtx.lineTo(canvas.width, canvas.height/2);
+    canvasCtx.stroke();
+
+  }
 }
 
 </script>

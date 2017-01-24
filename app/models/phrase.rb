@@ -4,6 +4,7 @@ class Phrase < ApplicationRecord
   before_save :update_phrase_path
   before_destroy :remove_from_s3
   
+  default_scope { order(created_at: :desc) }
 
   def generate_audio
     TextToSpeech.new(self.text)
