@@ -5,10 +5,6 @@ class PhrasesController < ApplicationController
     @phrases = Phrase.all
   end
 
-  def create
-   
-  end
-
   def destroy
     @phrase = Phrase.find(phrase_params[:id])
     if @phrase.destroy!
